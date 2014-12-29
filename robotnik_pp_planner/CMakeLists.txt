@@ -48,7 +48,7 @@ add_executable(robotnik_pp_planner_node src/purepursuit_planner.cpp src/Componen
 add_dependencies(robotnik_pp_planner_node robotnik_pp_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(robotnik_pp_planner_node
+target_link_libraries(robotnik_pp_planner_node rt
    ${catkin_LIBRARIES}
 )
 
