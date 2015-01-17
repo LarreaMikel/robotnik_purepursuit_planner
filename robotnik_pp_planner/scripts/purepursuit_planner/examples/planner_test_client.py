@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import roslib; roslib.load_manifest('planner_msgs')
+import roslib; roslib.load_manifest('robotnik_pp_msgs')
 import rospy
 import time
 # Brings in the SimpleActionClient
