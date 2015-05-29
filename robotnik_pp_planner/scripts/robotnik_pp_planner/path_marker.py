@@ -96,6 +96,11 @@ class PointPath(InteractiveMarker):
 	
 	def __init__(self, frame_id, name, description, is_manager = False, speed = 0.2):
 		InteractiveMarker.__init__(self)
+
+		marker_scale_x = rospy.get_param('~marker_scale_x', 0.1)
+		marker_scale_y = rospy.get_param('~marker_scale_y', 0.1)
+		marker_scale_z = rospy.get_param('~marker_scale_z', 0.5)
+		print "Marker scales " + str(marker_scale_x) + ", " + str(marker_scale_y) + ", " + str(marker_scale_z)
 		
 		self.header.frame_id = frame_id
 		self.name = name
@@ -103,9 +108,9 @@ class PointPath(InteractiveMarker):
 		self.speed = speed
 		self.marker = Marker()
 		self.marker.type = Marker.CYLINDER
-		self.marker.scale.x = 0.1
-		self.marker.scale.y = 0.1
-		self.marker.scale.z = 0.4
+		self.marker.scale.x = marker_scale_x
+		self.marker.scale.y = marker_scale_y
+		self.marker.scale.z = marker_scale_z
 		self.marker.pose.position.z = 0.20
 		if is_manager:
 			self.marker.color.r = 0.8
