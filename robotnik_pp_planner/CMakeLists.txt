@@ -55,10 +55,13 @@ target_link_libraries(robotnik_pp_planner_node rt
 #############
 ## Install ##
 #############
-
+install(
+  TARGETS robotnik_pp_planner_node
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 install(PROGRAMS
-   scripts/purepursuit_planner/path_marker.py
+   scripts/robotnik_pp_planner/path_marker.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
