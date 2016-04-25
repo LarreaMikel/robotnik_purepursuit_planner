@@ -1825,8 +1825,8 @@ public:
 		action_server_goto.publishFeedback(goto_feedback);
 		
 		if(goto_feedback.percent_complete == 100.0){
-			//action_server_goto.setSucceeded(goto_result);
-			action_server_goto.setAborted(goto_result);
+			action_server_goto.setSucceeded(goto_result);
+			//action_server_goto.setAborted(goto_result);
 			ROS_INFO("%s::AnalyseCB: Action finished", sComponentName.c_str());
 		}
 	}
