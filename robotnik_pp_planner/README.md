@@ -1,8 +1,10 @@
 # robotnik_pp_planner
 
+## 1 - robotnik_pp_planner_node
+
 Component that performs the pure pursuit navigation. Valid for Ackermann and Differential odometries.
 
-## Params
+### Params
 
 * position_source (string)
  * Sets whether to use the global /map reference or the robot's odometry
@@ -27,15 +29,41 @@ Component that performs the pure pursuit navigation. Valid for Ackermann and Dif
 * desired_freq (double)
  * control thread frequency of the controller (recommended 100 Hz)
  
- ## Topics
+ ### Topics
  
  ### Subscribers
 * /odom_topic (nav_msgs/Odometry)
  * gets the robot's odometry
  
- ### Publishers
+ #### Publishers
  
 * /cmd_topic_vel (ackermann_msgs/AckermannDriveStamped or geometry_msgs/Twist)
  * publishes the velocity commands to command the robot
  
- 
+### Simple Action Server
+* /robotnik_pp_planner/* (robotnik_pp_msgs/GoToAction) 
+ * accepts actions to follow a set of waypoints 
+
+### Bringup
+
+
+```
+$> roslaunch robotnik_pp_planer purepursuit.launch
+```
+
+## 2 - path_marker.py
+
+ROS node that creates Interactive Markers to create several waypoints and send them to the planner_node
+
+### Params
+
+* frame_id (string)
+ * frame to reference the markers and the created waypoints
+* planner (string)
+ * name of the action service to connect with
+
+### Bringup
+
+```
+$> roslaunch robotnik_pp_planer purepursuit_marker.launch
+```
