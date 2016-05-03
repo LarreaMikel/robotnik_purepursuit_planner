@@ -31,7 +31,7 @@ Component that performs the pure pursuit navigation. Valid for Ackermann and Dif
  
 ### 1.2 - Topics
  
-### 1.2.1 Subscribers
+#### 1.2.1 Subscribers
 * /odom_topic (nav_msgs/Odometry)
  * gets the robot's odometry
  
@@ -53,7 +53,7 @@ $> roslaunch robotnik_pp_planer purepursuit.launch
 
 ## 2 - path_marker.py
 
-ROS node that creates Interactive Markers to create several waypoints and send them to the planner_node
+ROS node that creates [Interactive Markers](http://wiki.ros.org/interactive_markers) to create several waypoints and send them to the planner_node
 
 ### 2.1 - Params
 
