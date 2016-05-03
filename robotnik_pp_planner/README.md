@@ -31,20 +31,20 @@ Component that performs the pure pursuit navigation. Valid for Ackermann and Dif
  
 ### 1.2 - Topics
  
-### Subscribers
+### 1.2.1 Subscribers
 * /odom_topic (nav_msgs/Odometry)
  * gets the robot's odometry
  
-#### 1.3 - Publishers
+#### 1.2.2 - Publishers
  
 * /cmd_topic_vel (ackermann_msgs/AckermannDriveStamped or geometry_msgs/Twist)
  * publishes the velocity commands to command the robot
  
-### 1.4 - Simple Action Server
+### 1.3 - Simple Action Server
 * /robotnik_pp_planner/* (robotnik_pp_msgs/GoToAction) 
  * accepts actions to follow a set of waypoints 
 
-### 1.5 - Bringup
+### 1.4 - Bringup
 
 
 ```
