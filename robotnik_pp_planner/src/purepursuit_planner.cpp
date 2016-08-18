@@ -31,6 +31,18 @@
 #include <geometry_msgs/Pose2D.h>
 #include <geometry_msgs/Twist.h>
 
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/ModelCoefficients.h>
+#include <pcl/sample_consensus/sac_model_line.h>
+#include <pcl/sample_consensus/sac_model.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/point_types.h>
+#include <pcl/io/io.h>
+
 //#include <s3000_laser/enable_disable.h>
 
 
@@ -62,6 +74,11 @@
 #define COMMAND_ACKERMANN_STRING			"Ackermann" 
 #define COMMAND_TWIST_STRING				"Twist" 
 
+
+#define DEFAULT_OBSTACLE_RANGE 3.0
+#define DEFAULT_FOOTPRINT_WIDTH 0.6
+#define DEFAULT_FOOTPRINT_LENGTH 1.0
+#define DEFAULT_LATERAL_CLEARANCE 0.5
 
 enum{
 	ODOM_SOURCE = 1,
@@ -713,6 +730,7 @@ class purepursuit_planner_node: public Component
 private:	
 	ros::NodeHandle node_handle_;
 	ros::NodeHandle private_node_handle_;
+    ros::Subscriber pcl_sub_;
 	double desired_freq_;
 	//! constant for Purepursuit
 	double Kr;
@@ -751,6 +769,24 @@ private:
     int command_type;
     //! Direction of movement (-1 or +1)
     int direction;
+
+    //!Flag variable to memorize if obstacles were detected
+    bool bObstacle;
+
+    double obs_x_low_, obs_x_high_,obs_y_low_,obs_y_high_;
+    double nav_lateral_clearance_;
+    double lateral_clearance_;
+    double footprint_width_;
+    double footprint_length_;
+    double nav_obstacle_range_;
+    double obstacle_range_;
+
+    //!Input cloud
+    pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_;
+    //!Obstacle cloud
+    pcl::PointCloud<pcl::PointXYZ>::Ptr obstacle_cloud_;
+    //!PointCloud2 header
+    std_msgs::Header header_;
     
 	//////// ROS
 	//! Publishes the status of the robot
@@ -764,6 +800,8 @@ private:
 	ros::Subscriber odom_sub_;
 	//! Topic name to read the odometry from
 	std::string odom_topic_;
+    //! Topic name to read the point cloud from
+    std::string pcl_topic_;
 	//! Topic name to publish the vel & pos commands
 	std::string cmd_topic_vel_;
 	// DIAGNOSTICS
@@ -792,7 +830,6 @@ private:
 	ros::ServiceClient sc_enable_back_laser_;
 	
 public:
-	
 	/*!	\fn summit_controller::purepursuit_planner()
 	 * 	\brief Public constructor
 	*/
@@ -822,6 +859,30 @@ public:
 		
 	}
 
+    void pclCallback(const sensor_msgs::PointCloud2& pcl_msg){
+      pcl::PCLPointCloud2 temp_pcl_;
+      pcl_conversions::toPCL(pcl_msg, temp_pcl_);
+      pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_);
+      //ROS_INFO("Received a tunnel cloud of %u points",(uint32_t)(input_cloud_->size()));
+
+      header_=pcl_msg.header;
+
+      /****** DO OBSTACLE DETECTION FIRST *******/
+      pcl::PassThrough<pcl::PointXYZ> pass;
+      pass.setInputCloud (input_cloud_);
+      pass.setFilterFieldName ("x");
+      pass.setFilterLimits (obs_x_low_,obs_x_high_);
+      pass.filter (*obstacle_cloud_);
+
+      pass.setInputCloud (obstacle_cloud_);
+      pass.setFilterFieldName ("y");
+      pass.setFilterLimits (obs_y_low_,obs_y_high_);
+      pass.filter (*obstacle_cloud_);
+
+      //ROS_INFO("Get an obstacle cloud of %u points",(uint32_t)(obstacle_cloud_->size()));
+      bObstacle = (obstacle_cloud_->points.size()>0) ? true : false;
+    }
+
 	/*!	\fn oid ROSSetup()
 	 * 	\brief Setups ROS' stuff
 	*/
@@ -839,9 +900,17 @@ public:
 		private_node_handle_.param("desired_freq", desired_freq_, desired_freq_);
 		private_node_handle_.param<std::string>("command_type", s_command_type, COMMAND_ACKERMANN_STRING);
 		private_node_handle_.param<std::string>("target_frame", target_frame_, "/base_footprint");
+        private_node_handle_.param<string>("pcl_topic", pcl_topic_, "/scan_cloud");
+
+        private_node_handle_.param("footprint_width",footprint_width_,DEFAULT_FOOTPRINT_WIDTH);
+        private_node_handle_.param("footprint_length",footprint_length_,DEFAULT_FOOTPRINT_LENGTH);
+        private_node_handle_.param("lateral_clearance",nav_lateral_clearance_,DEFAULT_LATERAL_CLEARANCE);
+        private_node_handle_.param("obstacle_range", nav_obstacle_range_, DEFAULT_OBSTACLE_RANGE);
 		
 		//private_node_handle_.param<std::string>("name_sc_enable_frot_laser_", name_sc_enable_front_laser_, "/s3000_laser_front/enable_disable");
 		//private_node_handl_.param<std::string>("name_sc_enable_back_laser", name_sc_enable_back_laser_, "/s3000_laser_back/enable_disable"	);
+
+        pcl_sub_=private_node_handle_.subscribe(pcl_topic_, 1, &purepursuit_planner_node::pclCallback, this);
 		
 		if(s_command_type.compare(COMMAND_ACKERMANN_STRING) == 0){
 			command_type = COMMAND_ACKERMANN;
@@ -902,6 +971,18 @@ public:
 		//ROS_INFO("%s::ROSSetup(): laser_topics: front -> %s, back -> %s", sComponentName.c_str(), name_sc_enable_front_laser_.c_str(), name_sc_enable_back_laser_.c_str());
 		
 		//last_command_time = ros::Time::now();
+
+        input_cloud_.reset(new  pcl::PointCloud<pcl::PointXYZ>());
+        obstacle_cloud_.reset(new  pcl::PointCloud<pcl::PointXYZ>());
+
+        obstacle_range_=nav_obstacle_range_;
+        lateral_clearance_=nav_lateral_clearance_;
+
+        bObstacle=true;
+        obs_x_low_=-footprint_length_/2;
+        obs_x_high_=obstacle_range_+footprint_length_/2;
+        obs_y_low_=-(footprint_width_/2+lateral_clearance_);
+        obs_y_high_=(footprint_width_/2+lateral_clearance_);
 	}
 	
 	
@@ -1039,12 +1120,19 @@ public:
 		if(CheckOdomReceive() == -1)
 			SwitchToState(EMERGENCY_STATE);
 		else{
-			if(bEnabled && !bCancel ){
+            if(bEnabled && !bCancel && !bObstacle){
 				
 				if(pathCurrent.Size() > 0 || MergePath() == OK){
 					ROS_INFO("%s::StandbyState: route available", sComponentName.c_str());
 					SwitchToState(READY_STATE);
 				}
+                else{
+                      if(pathCurrent.Size() > 0 && !bObstacle){
+                            ROS_WARN("%s::StandbyState: route available but obstacle detected", sComponentName.c_str());
+
+                      }
+                }
+
 			}
 				
 		}
@@ -1070,6 +1158,12 @@ public:
 			SwitchToState(STANDBY_STATE);
 			return;
 		}
+        if(bObstacle){
+          ROS_INFO("%s::ReadyState: Obstacle detected, cancel requested", sComponentName.c_str());
+          SetRobotSpeed(0.0, 0.0);
+          SwitchToState(STANDBY_STATE);
+          return;
+        }
 		
 		int ret = PurePursuit();
 		

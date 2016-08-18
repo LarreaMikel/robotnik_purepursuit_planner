@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
 )
 
+find_package(PCL REQUIRED)
 
 catkin_python_setup()
 
@@ -27,6 +28,7 @@ catkin_package(
 #  LIBRARIES purepursuit_planner
   CATKIN_DEPENDS roscpp actionlib nav_msgs roscpp std_msgs tf geometry_msgs robotnik_pp_msgs ackermann_msgs
 #  DEPENDS system_lib
+  DEPENDS PCL
 )
 
 ###########
@@ -36,9 +38,12 @@ catkin_package(
 
 include_directories(
   include
+  ${PCL_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
+add_definitions(${PCL_DEFINITIONS})
 
 ## Declare a cpp executable
 add_executable(robotnik_pp_planner_node src/purepursuit_planner.cpp src/Component.cc)
@@ -49,6 +54,7 @@ add_dependencies(robotnik_pp_planner_node robotnik_pp_msgs_generate_messages_cpp
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(robotnik_pp_planner_node rt
+   ${PCL_LIBRARIES}
    ${catkin_LIBRARIES}
 )
 
