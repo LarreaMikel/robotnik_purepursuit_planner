@@ -1076,17 +1076,17 @@ public:
 				break;
 				
 				case SHUTDOWN_STATE:
-                    ROS_INFO("purepursuit_planner::ControlThread(): ShutdownState");
+                    //ROS_INFO("purepursuit_planner::ControlThread(): ShutdownState");
 					ShutDownState();
 				break;
 				
 				case EMERGENCY_STATE:
-                    ROS_INFO("purepursuit_planner::ControlThread(): EmergencyState");
+                    //ROS_INFO("purepursuit_planner::ControlThread(): EmergencyState");
 					EmergencyState();
 				break;
 				
 				case FAILURE_STATE:
-                    ROS_INFO("purepursuit_planner::ControlThread(): FailureState");
+                    //ROS_INFO("purepursuit_planner::ControlThread(): FailureState");
 					FailureState();
 				break;
 			

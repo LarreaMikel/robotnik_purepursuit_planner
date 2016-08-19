@@ -65,6 +65,7 @@
 	<param name="command_type" value="Twist"/>
  	<param name="odom_topic" value="/summit_xl/odom"/>
     <param name="cmd_topic_vel" value="/cmd_vel"/>
+    <param name="obstacle_range" value="1.0"/>
 
   </node>
 
