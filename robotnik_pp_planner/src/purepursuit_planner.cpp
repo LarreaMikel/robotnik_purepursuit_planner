@@ -978,7 +978,7 @@ public:
         obstacle_range_=nav_obstacle_range_;
         lateral_clearance_=nav_lateral_clearance_;
 
-        bObstacle=true;
+        bObstacle=false;
         obs_x_low_=-footprint_length_/2;
         obs_x_high_=obstacle_range_+footprint_length_/2;
         obs_y_low_=-(footprint_width_/2+lateral_clearance_);
@@ -1061,26 +1061,32 @@ public:
 			switch(iState){
 				
 				case INIT_STATE:
+                    //ROS_INFO("purepursuit_planner::ControlThread(): InitState");
 					InitState();
 				break;
 				
 				case STANDBY_STATE:
+                    //ROS_INFO("purepursuit_planner::ControlThread(): StandbyState");
 					StandbyState();
 				break;
 				
 				case READY_STATE:
+                    //ROS_INFO("purepursuit_planner::ControlThread(): ReadyState");
 					ReadyState();
 				break;
 				
 				case SHUTDOWN_STATE:
+                    ROS_INFO("purepursuit_planner::ControlThread(): ShutdownState");
 					ShutDownState();
 				break;
 				
 				case EMERGENCY_STATE:
+                    ROS_INFO("purepursuit_planner::ControlThread(): EmergencyState");
 					EmergencyState();
 				break;
 				
 				case FAILURE_STATE:
+                    ROS_INFO("purepursuit_planner::ControlThread(): FailureState");
 					FailureState();
 				break;
 			
@@ -1101,7 +1107,7 @@ public:
 	/*!	\fn void InitState()
 	*/
 	void InitState(){
-		//ROS_INFO("purepursuit_planner::InitSate:");
+        //ROS_INFO("purepursuit_planner::InitSate: bInitialized:%d bRunning:%d CheckOdomReceive:%d", bInitialized, bRunning, CheckOdomReceive());
 		if(bInitialized && bRunning){
 			if(CheckOdomReceive() == 0)
 				SwitchToState(STANDBY_STATE);
