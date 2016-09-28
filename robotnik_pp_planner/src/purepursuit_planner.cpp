@@ -43,6 +43,7 @@
 #include <pcl/point_types.h>
 #include <pcl/io/io.h>
 
+
 //#include <s3000_laser/enable_disable.h>
 
 
@@ -730,7 +731,8 @@ class purepursuit_planner_node: public Component
 private:	
 	ros::NodeHandle node_handle_;
 	ros::NodeHandle private_node_handle_;
-    ros::Subscriber pcl_sub_;
+    ros::Subscriber pcl_sub_front_;
+    ros::Subscriber pcl_sub_back_;
 	double desired_freq_;
 	//! constant for Purepursuit
 	double Kr;
@@ -782,16 +784,20 @@ private:
     double obstacle_range_;
 
     //!Input cloud
-    pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_front_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_back_;
     //!Obstacle cloud
-    pcl::PointCloud<pcl::PointXYZ>::Ptr obstacle_cloud_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr obstacle_cloud_front_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr obstacle_cloud_back_;
     //!PointCloud2 header
     std_msgs::Header header_;
     
 	//////// ROS
 	//! Publishes the status of the robot
 	ros::Publisher status_pub_;
-	//! Publish to cmd vel (Ackermann)
+    ros::Publisher pub_obs_front;
+    ros::Publisher pub_obs_back;
+    //! Publish to cmd vel (Ackermann)
 	//! It will publish into command velocity (for the robot)
 	ros::Publisher vel_pub_;
 	//! publish the transformation between map->base_link
@@ -801,7 +807,8 @@ private:
 	//! Topic name to read the odometry from
 	std::string odom_topic_;
     //! Topic name to read the point cloud from
-    std::string pcl_topic_;
+    std::string pcl_topic_front_;
+    std::string pcl_topic_back_;
 	//! Topic name to publish the vel & pos commands
 	std::string cmd_topic_vel_;
 	// DIAGNOSTICS
@@ -859,28 +866,58 @@ public:
 		
 	}
 
-    void pclCallback(const sensor_msgs::PointCloud2& pcl_msg){
+    void pclCallbackFront(const sensor_msgs::PointCloud2& pcl_msg){
       pcl::PCLPointCloud2 temp_pcl_;
       pcl_conversions::toPCL(pcl_msg, temp_pcl_);
-      pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_);
+      pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_front_);
       //ROS_INFO("Received a tunnel cloud of %u points",(uint32_t)(input_cloud_->size()));
 
       header_=pcl_msg.header;
 
       /****** DO OBSTACLE DETECTION FIRST *******/
       pcl::PassThrough<pcl::PointXYZ> pass;
-      pass.setInputCloud (input_cloud_);
+      pass.setInputCloud (input_cloud_front_);
       pass.setFilterFieldName ("x");
       pass.setFilterLimits (obs_x_low_,obs_x_high_);
-      pass.filter (*obstacle_cloud_);
+      pass.filter (*obstacle_cloud_front_);
 
-      pass.setInputCloud (obstacle_cloud_);
+      pass.setInputCloud (obstacle_cloud_front_);
       pass.setFilterFieldName ("y");
       pass.setFilterLimits (obs_y_low_,obs_y_high_);
-      pass.filter (*obstacle_cloud_);
+      pass.filter (*obstacle_cloud_front_);
 
       //ROS_INFO("Get an obstacle cloud of %u points",(uint32_t)(obstacle_cloud_->size()));
-      bObstacle = (obstacle_cloud_->points.size()>0) ? true : false;
+      if(direction >0){
+        bObstacle = (obstacle_cloud_front_->points.size()>0) ? true : false;
+      }
+      //pub_obs_front.publish(obstacle_cloud_front_);
+    }
+    void pclCallbackBack(const sensor_msgs::PointCloud2& pcl_msg){
+      pcl::PCLPointCloud2 temp_pcl_;
+      pcl_conversions::toPCL(pcl_msg, temp_pcl_);
+      pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_front_);
+      //ROS_INFO("Received a tunnel cloud of %u points",(uint32_t)(input_cloud_->size()));
+
+      header_=pcl_msg.header;
+
+      /****** DO OBSTACLE DETECTION FIRST *******/
+      pcl::PassThrough<pcl::PointXYZ> pass;
+      pass.setInputCloud (input_cloud_back_);
+      pass.setFilterFieldName ("x");
+      pass.setFilterLimits (-obs_x_high_,-obs_x_low_);
+      pass.filter (*obstacle_cloud_back_);
+
+      pass.setInputCloud (obstacle_cloud_back_);
+      pass.setFilterFieldName ("y");
+      pass.setFilterLimits (obs_y_low_,obs_y_high_);
+      pass.filter (*obstacle_cloud_back_);
+
+      //ROS_INFO("Get an obstacle cloud of %u points",(uint32_t)(obstacle_cloud_->size()));
+      if(direction <0){
+        bObstacle = (obstacle_cloud_back_->points.size()>0) ? true : false;
+      }
+
+      //pub_obs_back.publish(obstacle_cloud_back_);
     }
 
 	/*!	\fn oid ROSSetup()
@@ -900,7 +937,8 @@ public:
 		private_node_handle_.param("desired_freq", desired_freq_, desired_freq_);
 		private_node_handle_.param<std::string>("command_type", s_command_type, COMMAND_ACKERMANN_STRING);
 		private_node_handle_.param<std::string>("target_frame", target_frame_, "/base_footprint");
-        private_node_handle_.param<string>("pcl_topic", pcl_topic_, "/scan_cloud");
+        private_node_handle_.param<string>("pcl_topic_front", pcl_topic_front_, "/scan_cloud_front");
+        private_node_handle_.param<string>("pcl_topic_back", pcl_topic_back_, "/scan_cloud_back");
 
         private_node_handle_.param("footprint_width",footprint_width_,DEFAULT_FOOTPRINT_WIDTH);
         private_node_handle_.param("footprint_length",footprint_length_,DEFAULT_FOOTPRINT_LENGTH);
@@ -910,7 +948,8 @@ public:
 		//private_node_handle_.param<std::string>("name_sc_enable_frot_laser_", name_sc_enable_front_laser_, "/s3000_laser_front/enable_disable");
 		//private_node_handl_.param<std::string>("name_sc_enable_back_laser", name_sc_enable_back_laser_, "/s3000_laser_back/enable_disable"	);
 
-        pcl_sub_=private_node_handle_.subscribe(pcl_topic_, 1, &purepursuit_planner_node::pclCallback, this);
+        pcl_sub_front_=private_node_handle_.subscribe(pcl_topic_front_, 1, &purepursuit_planner_node::pclCallbackFront, this);
+        pcl_sub_back_=private_node_handle_.subscribe(pcl_topic_back_, 1, &purepursuit_planner_node::pclCallbackBack, this);
 		
 		if(s_command_type.compare(COMMAND_ACKERMANN_STRING) == 0){
 			command_type = COMMAND_ACKERMANN;
@@ -972,8 +1011,10 @@ public:
 		
 		//last_command_time = ros::Time::now();
 
-        input_cloud_.reset(new  pcl::PointCloud<pcl::PointXYZ>());
-        obstacle_cloud_.reset(new  pcl::PointCloud<pcl::PointXYZ>());
+        input_cloud_front_.reset(new  pcl::PointCloud<pcl::PointXYZ>());
+        obstacle_cloud_front_.reset(new  pcl::PointCloud<pcl::PointXYZ>());
+        input_cloud_back_.reset(new  pcl::PointCloud<pcl::PointXYZ>());
+        obstacle_cloud_back_.reset(new  pcl::PointCloud<pcl::PointXYZ>());
 
         obstacle_range_=nav_obstacle_range_;
         lateral_clearance_=nav_lateral_clearance_;
@@ -983,6 +1024,9 @@ public:
         obs_x_high_= obstacle_range_;//+footprint_length_/2;
         obs_y_low_=-(footprint_width_/2+lateral_clearance_);
         obs_y_high_=(footprint_width_/2+lateral_clearance_);
+
+        //pub_obs_front = private_node_handle_.advertise<sensor_msgs::PointCloud2> ("obstacle_front", 1);
+        //pub_obs_back = private_node_handle_.advertise<sensor_msgs::PointCloud2> ("obstacle_back", 1);
 	}
 	
 	
