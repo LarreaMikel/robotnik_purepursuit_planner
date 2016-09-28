@@ -75,7 +75,7 @@
 #define COMMAND_TWIST_STRING				"Twist" 
 
 
-#define DEFAULT_OBSTACLE_RANGE 3.0
+#define DEFAULT_OBSTACLE_RANGE 1.0
 #define DEFAULT_FOOTPRINT_WIDTH 0.6
 #define DEFAULT_FOOTPRINT_LENGTH 1.0
 #define DEFAULT_LATERAL_CLEARANCE 0.5
@@ -980,7 +980,7 @@ public:
 
         bObstacle=false;
         obs_x_low_=-footprint_length_/2;
-        obs_x_high_=obstacle_range_+footprint_length_/2;
+        obs_x_high_= obstacle_range_;//+footprint_length_/2;
         obs_y_low_=-(footprint_width_/2+lateral_clearance_);
         obs_y_high_=(footprint_width_/2+lateral_clearance_);
 	}

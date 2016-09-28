@@ -11,15 +11,17 @@
 	<param name="desired_freq" value="50.0"/>
 
 	<!--for Ackerman-->
-	<!--param name="d_dist_wheel_to_center" value="1.0"/-->
+	<param name="d_dist_wheel_to_center" value="1.0"/>
 	<!-- type of velocity command (depending on odometry configuration): Ackermann, Twist -->
-	<!--
+	
 	<param name="command_type" value="Ackermann"/>
  	<param name="odom_topic" value="/agvs_robot_control/odom"/>
-        <param name="cmd_topic_vel" value="/agvs_robot_control/command"/-->
+        <param name="cmd_topic_vel" value="/agvs_robot_control/command"/>
+	<!--
 	<param name="command_type" value="Twist"/>
  	<param name="odom_topic" value="/summit_xl/odom"/>
         <param name="cmd_topic_vel" value="/summit_xl/summit_xl_robot_control/command"/>
+        -->
   </node>
 
 </launch>
