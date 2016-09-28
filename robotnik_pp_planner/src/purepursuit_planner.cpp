@@ -887,7 +887,7 @@ public:
       pass.filter (*obstacle_cloud_front_);
 
       //ROS_INFO("Get an obstacle cloud of %u points",(uint32_t)(obstacle_cloud_->size()));
-      if(direction >0){
+      if(direction >=0){
         bObstacle = (obstacle_cloud_front_->points.size()>0) ? true : false;
       }
       //pub_obs_front.publish(obstacle_cloud_front_);
