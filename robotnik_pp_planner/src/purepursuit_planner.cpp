@@ -898,7 +898,7 @@ public:
     void pclCallbackBack(const sensor_msgs::PointCloud2& pcl_msg){
       pcl::PCLPointCloud2 temp_pcl_;
       pcl_conversions::toPCL(pcl_msg, temp_pcl_);
-      pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_front_);
+      pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_back_);
       //ROS_INFO("Received a tunnel cloud of %u points",(uint32_t)(input_cloud_->size()));
 
       header_=pcl_msg.header;
