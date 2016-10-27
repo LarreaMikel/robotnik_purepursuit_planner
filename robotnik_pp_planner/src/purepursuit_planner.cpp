@@ -1173,9 +1173,10 @@ public:
 	/*!	\fn void StandbyState()
 	*/
 	void StandbyState(){
-		if(CheckOdomReceive() == -1)
+		if(CheckOdomReceive() == -1){
+			ROS_ERROR("%s::StandbyState: Error receiving the odometry", sComponentName.c_str());
 			SwitchToState(EMERGENCY_STATE);
-		else{
+		}else{
             if(bEnabled && !bCancel && !bObstacle){
 				
 				if(pathCurrent.Size() > 0 || MergePath() == OK){
@@ -1189,7 +1190,8 @@ public:
                       }
                 }
 
-			}
+			}else
+				ROS_INFO("%s::StandbyState: Enabled(%d), Cancel(%d), Obstacle(%d)",sComponentName.c_str(), bEnabled, bCancel, bObstacle);
 				
 		}
 	}
