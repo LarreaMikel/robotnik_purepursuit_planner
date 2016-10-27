@@ -3,6 +3,7 @@ project(robotnik_pp_msgs)
 
 find_package(catkin REQUIRED COMPONENTS
   message_generation
+  message_runtime
   actionlib
   actionlib_msgs
   geometry_msgs
@@ -13,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
    FILES
    goal.msg
+   objectDetected.msg
 )
 
 add_action_files(DIRECTORY action FILES GoTo.action)

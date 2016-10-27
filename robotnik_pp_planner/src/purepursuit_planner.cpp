@@ -28,6 +28,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <robotnik_pp_msgs/GoToAction.h>
 #include <robotnik_pp_msgs/goal.h>
+#include <robotnik_pp_msgs/objectDetected.h>
 #include <geometry_msgs/Pose2D.h>
 #include <geometry_msgs/Twist.h>
 
@@ -774,6 +775,8 @@ private:
 
     //!Flag variable to memorize if obstacles were detected
     bool bObstacle;
+    bool bObsFront;
+    bool bObsBack;
 
     double obs_x_low_, obs_x_high_,obs_y_low_,obs_y_high_;
     double nav_lateral_clearance_;
@@ -797,6 +800,7 @@ private:
 	ros::Publisher status_pub_;
     ros::Publisher pub_obs_front;
     ros::Publisher pub_obs_back;
+    ros::Publisher pub_objectDetected;
     //! Publish to cmd vel (Ackermann)
 	//! It will publish into command velocity (for the robot)
 	ros::Publisher vel_pub_;
@@ -825,6 +829,7 @@ private:
 	robotnik_pp_msgs::GoToFeedback goto_feedback;
 	robotnik_pp_msgs::GoToResult goto_result;
 	robotnik_pp_msgs::GoToGoal goto_goal;
+    robotnik_pp_msgs::objectDetected objDet;
 	// TFs
 	tf::TransformListener listener;
 	tf::StampedTransform transform;
@@ -889,9 +894,11 @@ public:
       //ROS_INFO("Get an obstacle cloud of %u points",(uint32_t)(obstacle_cloud_->size()));
       if(direction >0){
         bObstacle = (obstacle_cloud_front_->points.size()>0) ? true : false;
+        bObsFront = bObstacle;
       }
       else if(direction == 0){
           bObstacle = false;
+          bObsFront = bObstacle;
       }
       //pub_obs_front.publish(obstacle_cloud_front_);
     }
@@ -918,9 +925,11 @@ public:
       //ROS_INFO("Get an obstacle cloud of %u points",(uint32_t)(obstacle_cloud_->size()));
       if(direction <0){
         bObstacle = (obstacle_cloud_back_->points.size()>0) ? true : false;
+        bObsBack = bObstacle;
       }
       else if(direction == 0){
           bObstacle = false;
+          bObsBack = bObstacle;
       }
 
       //pub_obs_back.publish(obstacle_cloud_back_);
@@ -1026,6 +1035,8 @@ public:
         lateral_clearance_=nav_lateral_clearance_;
 
         bObstacle=false;
+        bObsFront = false;
+        bObsBack = false;
         obs_x_low_=-footprint_length_/2;
         obs_x_high_= obstacle_range_;//+footprint_length_/2;
         obs_y_low_=-(footprint_width_/2+lateral_clearance_);
@@ -1033,6 +1044,7 @@ public:
 
         //pub_obs_front = private_node_handle_.advertise<sensor_msgs::PointCloud2> ("obstacle_front", 1);
         //pub_obs_back = private_node_handle_.advertise<sensor_msgs::PointCloud2> ("obstacle_back", 1);
+        pub_objectDetected = private_node_handle_.advertise<robotnik_pp_msgs::objectDetected>("object_detection",1);
 	}
 	
 	
@@ -1656,6 +1668,10 @@ public:
 			}
 		}
 		
+        objDet.front = bObsFront;
+        objDet.back = bObsBack;
+        pub_objectDetected.publish(objDet);
+
 		AnalyseCB();	// Checks action server state
 		
 		ReadAndPublish();	// Reads and publish into configured topics
@@ -1869,7 +1885,7 @@ public:
 		
 		
 		if(action_server_goto.isNewGoalAvailable()){
-			goto_goal.target = action_server_goto.acceptNewGoal()->target; // Reads points from action server
+            goto_goal.target = action_server_goto.acceptNewGoal()->target; // Reads points from action server
 			if(goto_goal.target.size() > 0){
 				if(goto_goal.target.size() > 1){	// Tries to use the second point of the route
 					direction = CalculateDirectionSpeed(goto_goal.target[1].pose);
