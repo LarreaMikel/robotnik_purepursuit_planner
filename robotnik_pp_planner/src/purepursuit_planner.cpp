@@ -28,7 +28,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <robotnik_pp_msgs/GoToAction.h>
 #include <robotnik_pp_msgs/goal.h>
-#include <robotnik_pp_msgs/objectDetected.h>
+#include <robotnik_pp_msgs/ObjectDetected.h>
 #include <geometry_msgs/Pose2D.h>
 #include <geometry_msgs/Twist.h>
 
@@ -829,7 +829,7 @@ private:
 	robotnik_pp_msgs::GoToFeedback goto_feedback;
 	robotnik_pp_msgs::GoToResult goto_result;
 	robotnik_pp_msgs::GoToGoal goto_goal;
-    robotnik_pp_msgs::objectDetected objDet;
+    robotnik_pp_msgs::ObjectDetected objDet;
 	// TFs
 	tf::TransformListener listener;
 	tf::StampedTransform transform;
@@ -1044,7 +1044,7 @@ public:
 
         //pub_obs_front = private_node_handle_.advertise<sensor_msgs::PointCloud2> ("obstacle_front", 1);
         //pub_obs_back = private_node_handle_.advertise<sensor_msgs::PointCloud2> ("obstacle_back", 1);
-        pub_objectDetected = private_node_handle_.advertise<robotnik_pp_msgs::objectDetected>("object_detection",1);
+        pub_objectDetected = private_node_handle_.advertise<robotnik_pp_msgs::ObjectDetected>("object_detection",1);
 	}
 	
 	
