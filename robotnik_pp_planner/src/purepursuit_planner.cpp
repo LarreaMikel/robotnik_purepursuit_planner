@@ -872,29 +872,30 @@ public:
 	}
 
     void pclCallbackFront(const sensor_msgs::PointCloud2& pcl_msg){
-      pcl::PCLPointCloud2 temp_pcl_;
-      pcl_conversions::toPCL(pcl_msg, temp_pcl_);
-      pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_front_);
-      //ROS_INFO("Received a tunnel cloud of %u points",(uint32_t)(input_cloud_->size()));
-
-      header_=pcl_msg.header;
-
-      /****** DO OBSTACLE DETECTION FIRST *******/
-      pcl::PassThrough<pcl::PointXYZ> pass;
-      pass.setInputCloud (input_cloud_front_);
-      pass.setFilterFieldName ("x");
-      pass.setFilterLimits (obs_x_low_,obs_x_high_);
-      pass.filter (*obstacle_cloud_front_);
-
-      pass.setInputCloud (obstacle_cloud_front_);
-      pass.setFilterFieldName ("y");
-      pass.setFilterLimits (obs_y_low_,obs_y_high_);
-      pass.filter (*obstacle_cloud_front_);
+     
 
       //ROS_INFO("Get an obstacle cloud of %u points",(uint32_t)(obstacle_cloud_->size()));
       if(direction >0){
-        bObstacle = (obstacle_cloud_front_->points.size()>0) ? true : false;
-        bObsFront = bObstacle;
+		pcl::PCLPointCloud2 temp_pcl_;
+		pcl_conversions::toPCL(pcl_msg, temp_pcl_);
+		pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_front_);
+		//ROS_INFO("Received a tunnel cloud of %u points",(uint32_t)(input_cloud_->size()));
+
+		header_=pcl_msg.header;
+
+		/****** DO OBSTACLE DETECTION FIRST *******/
+		pcl::PassThrough<pcl::PointXYZ> pass;
+		pass.setInputCloud (input_cloud_front_);
+		pass.setFilterFieldName ("x");
+		pass.setFilterLimits (obs_x_low_,obs_x_high_);
+		pass.filter (*obstacle_cloud_front_);
+
+		pass.setInputCloud (obstacle_cloud_front_);
+		pass.setFilterFieldName ("y");
+		pass.setFilterLimits (obs_y_low_,obs_y_high_);
+		pass.filter (*obstacle_cloud_front_);
+		bObstacle = (obstacle_cloud_front_->points.size()>0) ? true : false;
+		bObsFront = bObstacle;
       }
       else if(direction == 0){
           bObstacle = false;
@@ -903,27 +904,28 @@ public:
       //pub_obs_front.publish(obstacle_cloud_front_);
     }
     void pclCallbackBack(const sensor_msgs::PointCloud2& pcl_msg){
-      pcl::PCLPointCloud2 temp_pcl_;
-      pcl_conversions::toPCL(pcl_msg, temp_pcl_);
-      pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_back_);
-      //ROS_INFO("Received a tunnel cloud of %u points",(uint32_t)(input_cloud_->size()));
-
-      header_=pcl_msg.header;
-
-      /****** DO OBSTACLE DETECTION FIRST *******/
-      pcl::PassThrough<pcl::PointXYZ> pass;
-      pass.setInputCloud (input_cloud_back_);
-      pass.setFilterFieldName ("x");
-      pass.setFilterLimits (-obs_x_high_,-obs_x_low_);
-      pass.filter (*obstacle_cloud_back_);
-
-      pass.setInputCloud (obstacle_cloud_back_);
-      pass.setFilterFieldName ("y");
-      pass.setFilterLimits (obs_y_low_,obs_y_high_);
-      pass.filter (*obstacle_cloud_back_);
+     
 
       //ROS_INFO("Get an obstacle cloud of %u points",(uint32_t)(obstacle_cloud_->size()));
       if(direction <0){
+		pcl::PCLPointCloud2 temp_pcl_;
+		pcl_conversions::toPCL(pcl_msg, temp_pcl_);
+		pcl::fromPCLPointCloud2(temp_pcl_,*input_cloud_back_);
+		//ROS_INFO("Received a tunnel cloud of %u points",(uint32_t)(input_cloud_->size()));
+
+		header_=pcl_msg.header;
+
+		/****** DO OBSTACLE DETECTION FIRST *******/
+		pcl::PassThrough<pcl::PointXYZ> pass;
+		pass.setInputCloud (input_cloud_back_);
+		pass.setFilterFieldName ("x");
+		pass.setFilterLimits (-obs_x_high_,-obs_x_low_);
+		pass.filter (*obstacle_cloud_back_);
+
+		pass.setInputCloud (obstacle_cloud_back_);
+		pass.setFilterFieldName ("y");
+		pass.setFilterLimits (obs_y_low_,obs_y_high_);
+		pass.filter (*obstacle_cloud_back_);
         bObstacle = (obstacle_cloud_back_->points.size()>0) ? true : false;
         bObsBack = bObstacle;
       }
