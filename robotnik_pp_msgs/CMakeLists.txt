@@ -14,7 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
    FILES
    goal.msg
-   objectDetected.msg
+   ObjectDetected.msg
 )
 
 add_action_files(DIRECTORY action FILES GoTo.action)
