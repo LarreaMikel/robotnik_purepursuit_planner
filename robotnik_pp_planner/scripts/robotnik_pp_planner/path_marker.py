@@ -162,6 +162,7 @@ class PointPathManager(InteractiveMarkerServer):
 		entry = self.menu_handler.insert( "0.2 m/s", parent=entry_new, callback=self.newPointCB_02)
 		entry = self.menu_handler.insert( "0.4 m/s", parent=entry_new, callback=self.newPointCB_04)
 		entry = self.menu_handler.insert( "0.6 m/s", parent=entry_new, callback=self.newPointCB_06)
+		entry = self.menu_handler.insert( "1.0 m/s", parent=entry_new, callback=self.newPointCB_10)
 		h_second_entry = self.menu_handler.insert( "Path" )
 		entry = self.menu_handler.insert( "Go", parent=h_second_entry, callback=self.startRouteCB)	# Send the path from the first point to the last one
 		entry = self.menu_handler.insert( "Stop", parent=h_second_entry, callback=self.stopRouteCB)	# Stops the current path 
@@ -234,6 +235,10 @@ class PointPathManager(InteractiveMarkerServer):
 	def newPointCB_06(self, feedback):
 		#print 'newPointCB'
 		self.createNewPoint(0.6)
+	## @brief Callback called to create a new poing	
+	def newPointCB_10(self, feedback):
+		#print 'newPointCB'
+		self.createNewPoint(1.0)
 		
 	## @brief Callback called to create a new poing	
 	def deletePointCB(self, feedback):

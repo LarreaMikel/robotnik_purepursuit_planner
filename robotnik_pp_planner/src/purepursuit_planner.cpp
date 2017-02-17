@@ -50,7 +50,7 @@
 
 #define ODOM_TIMEOUT_ERROR					0.2				// max num. of seconds without receiving odom values
 #define MAP_TIMEOUT_ERROR					0.2				// max num. of seconds without receiving map transformations
-#define AGVS_TURN_RADIUS					0.20			// distancia en la que empieza a girar el robot cuando llega a una esquina
+#define AGVS_TURN_RADIUS					0.79			// distancia en la que empieza a girar el robot cuando llega a una esquina
 #define MIN_ANGLE_BEZIER					0.261799388		// ángulo (radianes) mínimo entre segmentos de la recta para los que ajustaremos a una curva de BEZIER
 #define BEZIER_CONTROL_POINTS				5
 
@@ -840,6 +840,11 @@ private:
 	ros::ServiceClient sc_enable_front_laser_;
 	//! Service to enable/disable back laser
 	ros::ServiceClient sc_enable_back_laser_;
+	//! goal tolerance
+	double goal_tolerance_;
+	double last_dist_to_goal;
+	//! 
+	bool static_lookahead_;
 	
 public:
 	/*!	\fn summit_controller::purepursuit_planner()
@@ -862,6 +867,7 @@ public:
 		sComponentName.assign("purepursuit_planner_node");
 		iState = INIT_STATE;
 		direction = 0;
+		last_dist_to_goal = 9999999;
 	}
 
 	/*!	\fn purepursuit_planner::~purepursuit_planner()
@@ -961,6 +967,8 @@ public:
         private_node_handle_.param("footprint_length",footprint_length_,DEFAULT_FOOTPRINT_LENGTH);
         private_node_handle_.param("lateral_clearance",nav_lateral_clearance_,DEFAULT_LATERAL_CLEARANCE);
         private_node_handle_.param("obstacle_range", nav_obstacle_range_, DEFAULT_OBSTACLE_RANGE);
+        private_node_handle_.param("goal_tolerance", goal_tolerance_, WAYPOINT_POP_DISTANCE_M);
+        private_node_handle_.param("static_lookahead", static_lookahead_, true);
 		
 		//private_node_handle_.param<std::string>("name_sc_enable_frot_laser_", name_sc_enable_front_laser_, "/s3000_laser_front/enable_disable");
 		//private_node_handl_.param<std::string>("name_sc_enable_back_laser", name_sc_enable_back_laser_, "/s3000_laser_back/enable_disable"	);
@@ -1230,12 +1238,12 @@ public:
 			SwitchToState(STANDBY_STATE);
 			return;
 		}
-        if(bObstacle){
-          ROS_INFO("%s::ReadyState: Obstacle detected, cancel requested", sComponentName.c_str());
+        /*if(bObstacle){
+          ROS_INFO("%s::ReadyState: Obstacle detected", sComponentName.c_str());
           SetRobotSpeed(0.0, 0.0);
-          SwitchToState(STANDBY_STATE);
+          //SwitchToState(STANDBY_STATE);
           return;
-        }
+        }*/
 		
 		int ret = PurePursuit();
 		
@@ -1482,7 +1490,8 @@ public:
 		
 		//
 		//Updates the lookahead depending of the current velocity
-		UpdateLookAhead();
+		if(not static_lookahead_)
+			UpdateLookAhead();
 		
 		//
 		// Get next point in cartesian coordinates
@@ -1565,22 +1574,32 @@ public:
 			SetRobotSpeed(dAuxSpeed, wref*direction); 
 		}
 		
+		double ddist2 = Dist( current_position.x, current_position.y, last_waypoint.dX, last_waypoint.dY);
 		//
 		// When the robot is on the last waypoint, checks the distance to the end
 		if( pathCurrent.GetCurrentWaypointIndex() >= (pathCurrent.NumOfWaypoints() - 2) ){
 			ret = -10;
-			double ddist2 = Dist( current_position.x, current_position.y, last_waypoint.dX, last_waypoint.dY);
+			if(ddist2 > last_dist_to_goal and fabs(ddist2- last_dist_to_goal) > goal_tolerance_){
+				ROS_WARN("%s::PurePursuit: dist to goal = %.3lf m. Last = %.3lf. CANCELLING GOAL", sComponentName.c_str(), ddist2, last_dist_to_goal);
+				SetRobotSpeed(0.0, 0.0);
+				pathCurrent.Clear();
+				return 1;
+			}
 			// Distancia recorrida
 			//dDistCovered = Dist( current_position.px, current_position.py, odomWhenLastWaypoint.px, odomWhenLastWaypoint.py);
-			if (ddist2 < WAYPOINT_POP_DISTANCE_M) {
+			if (ddist2 <= goal_tolerance_) {
 				SetRobotSpeed(0.0, 0.0);
 				
-				ROS_INFO("%s::PurePursuit: target position reached (%lf, %lf, %lf). Ending current path", sComponentName.c_str(), current_position.x, current_position.x, current_position.theta*180.0/Pi);
+				ROS_INFO("%s::PurePursuit: target position reached (%lf, %lf, %lf) at %.3lf m from the target. Ending current path", sComponentName.c_str(),
+				 current_position.x, current_position.x, current_position.theta*180.0/Pi, ddist2);
 				
 				pathCurrent.Clear();
 				return 1;
 			}
+			
 		}
+		
+		last_dist_to_goal = ddist2;
 
 		return 0;
 	}
@@ -1957,6 +1976,7 @@ public:
 					
 					return OK;
 				}
+				last_dist_to_goal = 99999999;
 			}
 		
 		}
