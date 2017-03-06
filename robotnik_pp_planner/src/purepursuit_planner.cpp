@@ -64,9 +64,9 @@
 
 #define WAYPOINT_POP_DISTANCE_M				0.10		//Distancia mínima para alcanzar punto objetivo m (PurePursuit)
 
-#define AGVS_FIRST_DECELERATION_DISTANCE 	1.0 	// meters -> when the vehicle is arriving to the goal, it has to decelarate at this distance
-#define AGVS_FIRST_DECELERATION_MAXSPEED	0.15	// m/s
-#define AGVS_SECOND_DECELERATION_DISTANCE   0.25 	// meters -> when the vehicle is arriving to the goal, it has to decelarate another time at this distance
+#define AGVS_FIRST_DECELERATION_DISTANCE 	2.0 	// meters -> when the vehicle is arriving to the goal, it has to decelarate at this distance
+#define AGVS_FIRST_DECELERATION_MAXSPEED	0.3	// m/s
+#define AGVS_SECOND_DECELERATION_DISTANCE   0.5 	// meters -> when the vehicle is arriving to the goal, it has to decelarate another time at this distance
 #define AGVS_SECOND_DECELERATION_MAXSPEED	0.1 	// m/s
 #define AGVS_DEFAULT_KR	0.20						// 
 
@@ -82,7 +82,8 @@
 #define DEFAULT_FOOTPRINT_LENGTH 			1.0
 #define DEFAULT_LATERAL_CLEARANCE 			0.5
 
-#define GOAL_ERROR_TOLERANCE				0.1
+#define GOAL_ERROR_TOLERANCE				0.05
+#define ERROR_GOAL_DISTANCE					0.10
 
 enum{
 	ODOM_SOURCE = 1,
@@ -1596,22 +1597,27 @@ public:
 		// When the robot is on the last waypoint, checks the distance to the end
 		if( pathCurrent.GetCurrentWaypointIndex() >= (pathCurrent.NumOfWaypoints() - 2) ){
 			ret = -10;
-			if(ddist2 > last_dist_to_goal and fabs(ddist2 - last_dist_to_goal) > 0.1){
-				ROS_WARN("%s::PurePursuit: dist to goal = %.3lf m. Last = %.3lf. CANCELLING GOAL", sComponentName.c_str(), ddist2, last_dist_to_goal);
-				SetRobotSpeed(0.0, 0.0);
-				pathCurrent.Clear();
-				return -1;
-			}
-			// Distancia recorrida
-			//dDistCovered = Dist( current_position.px, current_position.py, odomWhenLastWaypoint.px, odomWhenLastWaypoint.py);
-			if (ddist2 <= goal_tolerance_) {
-				SetRobotSpeed(0.0, 0.0);
-				
-				ROS_INFO("%s::PurePursuit: target position reached (%lf, %lf, %lf) at %.3lf m from the target. Ending current path", sComponentName.c_str(),
-				 current_position.x, current_position.x, current_position.theta*180.0/Pi, ddist2);
-				
-				pathCurrent.Clear();
-				return 1;
+			//ROS_WARN("%s::PurePursuit: dist to goal = %.3lf m. Last = %.3lf", sComponentName.c_str(), ddist2, last_dist_to_goal);
+			
+			if(ddist2 <= ERROR_GOAL_DISTANCE){
+				if(ddist2 > last_dist_to_goal){ //and fabs(ddist2 - last_dist_to_goal) > ERROR_GOAL_DISTANCE){
+					ROS_ERROR("%s::PurePursuit: dist to goal = %.3lf m. Last = %.3lf. CANCELLING GOAL", sComponentName.c_str(), ddist2, last_dist_to_goal);
+					SetRobotSpeed(0.0, 0.0);
+					pathCurrent.Clear();
+					return -1;
+				}
+			
+				// Distancia recorrida
+				//dDistCovered = Dist( current_position.px, current_position.py, odomWhenLastWaypoint.px, odomWhenLastWaypoint.py);
+				if (ddist2 <= goal_tolerance_) {
+					SetRobotSpeed(0.0, 0.0);
+					
+					ROS_INFO("%s::PurePursuit: target position reached (%lf, %lf, %lf) at %.3lf m from the target. Ending current path", sComponentName.c_str(),
+					 current_position.x, current_position.x, current_position.theta*180.0/Pi, ddist2);
+					
+					pathCurrent.Clear();
+					return 1;
+				}
 			}
 			
 		}
@@ -1711,13 +1717,15 @@ public:
         objDet.front = bObsFront;
         objDet.back = bObsBack;
         pub_objectDetected.publish(objDet);
-
+		
+		if(bCancel)		// Performs the cancel in case of required
+			CancelPath();
+			
 		AnalyseCB();	// Checks action server state
 		
 		ReadAndPublish();	// Reads and publish into configured topics
 		
-		if(bCancel)		// Performs the cancel in case of required
-			CancelPath();
+		
 	}
 	
 	/*! \fn void OdomCallback(const nav_msgs::Odometry::ConstPtr& odom_value)
