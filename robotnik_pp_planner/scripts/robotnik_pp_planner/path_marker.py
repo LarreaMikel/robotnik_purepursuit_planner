@@ -400,5 +400,15 @@ if __name__=="__main__":
 	
 	server = PointPathManager(_name, frame_id = args['frame_id'], planner = args['planner'])
 	
-	rospy.spin()
+
+	
+	while rospy.is_shutdown():
+		
+		try:
+			rospy.sleep(t_sleep)
+		except rospy.exceptions.ROSInterruptException:
+			rospy.loginfo('Main: ROS interrupt exception')
+			self.running = False
+			
+		
 
