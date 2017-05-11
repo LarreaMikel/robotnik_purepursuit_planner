@@ -756,7 +756,7 @@ private:
     //! current robot's linear speed
     double dLinearSpeed;
     //! Lookahead bounds
-    double d_lookahear_min_, d_lookahear_max_;
+    double d_lookahead_min_, d_lookahead_max_;
     //! Distance from the robot center to the wheel's center
     double d_dist_wheel_to_center_;
     //! Max allowed speed
@@ -867,7 +867,7 @@ public:
 		
 		ROSSetup();
 		
-		dLookAhead = d_lookahear_min_;
+		dLookAhead = d_lookahead_min_;
 		dLinearSpeed = 0;
 		pose2d_robot.x = pose2d_robot.y = pose2d_robot.theta = 0.0;
 		bEnabled = true;
@@ -960,8 +960,8 @@ public:
 		
 		private_node_handle_.param<std::string>("odom_topic", odom_topic_, "/odom");
 		private_node_handle_.param("cmd_topic_vel", cmd_topic_vel_, std::string("/agvs_controller/command"));
-		private_node_handle_.param("d_lookahear_min", d_lookahear_min_, D_LOOKAHEAD_MIN);
-		private_node_handle_.param("d_lookahear_max", d_lookahear_max_, D_LOOKAHEAD_MAX);
+		private_node_handle_.param("d_lookahead_min", d_lookahead_min_, D_LOOKAHEAD_MIN);
+		private_node_handle_.param("d_lookahead_max", d_lookahead_max_, D_LOOKAHEAD_MAX);
 		private_node_handle_.param("d_dist_wheel_to_center", d_dist_wheel_to_center_, D_WHEEL_ROBOT_CENTER);
 		private_node_handle_.param("max_speed", max_speed_, MAX_SPEED);
 		private_node_handle_.param("kr", Kr, AGVS_DEFAULT_KR);
@@ -1041,8 +1041,8 @@ public:
         //sc_enable_front_laser_ = private_node_handle_.serviceClient<s3000_laser::enable_disable>(name_sc_enable_front_laser_);
         //sc_enable_back_laser_ = private_node_handle_.serviceClient<s3000_laser::enable_disable>(name_sc_enable_back_laser_);
         
-		ROS_INFO("%s::ROSSetup(): odom_topic = %s, command_topic_vel = %s, position source = %s, desired_hz=%.1lf, min_lookahead = %.1lf, max_lookahead = %.1lf, kr = %.2lf, command_type = %s", sComponentName.c_str(), odom_topic_.c_str(),
-		 cmd_topic_vel_.c_str(), position_source_.c_str(), desired_freq_, d_lookahear_min_, d_lookahear_max_, Kr, s_command_type.c_str());
+		ROS_INFO("%s::ROSSetup(): odom_topic = %s, command_topic_vel = %s, position source = %s, desired_hz=%.3lf, min_lookahead = %.3lf, max_lookahead = %.3lf, kr = %.2lf, command_type = %s", sComponentName.c_str(), odom_topic_.c_str(),
+		 cmd_topic_vel_.c_str(), position_source_.c_str(), desired_freq_, d_lookahead_min_, d_lookahead_max_, Kr, s_command_type.c_str());
 		
 		//ROS_INFO("%s::ROSSetup(): laser_topics: front -> %s, back -> %s", sComponentName.c_str(), name_sc_enable_front_laser_.c_str(), name_sc_enable_back_laser_.c_str());
 		
@@ -1294,10 +1294,10 @@ public:
 		double desired_lookahead = 0.0;
 		double inc = 0.01;	// incremento del lookahead
 		
-		if(aux_lookahead < d_lookahear_min_)
-			desired_lookahead = d_lookahear_min_;
-		else if(aux_lookahead > d_lookahear_max_)
-			desired_lookahead = d_lookahear_max_;
+		if(aux_lookahead < d_lookahead_min_)
+			desired_lookahead = d_lookahead_min_;
+		else if(aux_lookahead > d_lookahead_max_)
+			desired_lookahead = d_lookahead_max_;
 		else{
 			desired_lookahead = aux_lookahead;
 		}
@@ -1580,7 +1580,7 @@ public:
 				dAuxSpeed = AGVS_SECOND_DECELERATION_MAXSPEED;
 
 		}else if(dAuxDist <= AGVS_FIRST_DECELERATION_DISTANCE) {
-			if( (dAuxSpeed < 0.0) && (dAuxSpeed < AGVS_FIRST_DECELERATION_MAXSPEED))
+			if( (dAuxSpeed < 0.0) && (dAuxSpeed < -AGVS_FIRST_DECELERATION_MAXSPEED))
 				dAuxSpeed = -AGVS_FIRST_DECELERATION_MAXSPEED;
 			else if( (dAuxSpeed > 0.0) && (dAuxSpeed > AGVS_FIRST_DECELERATION_MAXSPEED) )
 				dAuxSpeed = AGVS_FIRST_DECELERATION_MAXSPEED;
@@ -1591,7 +1591,7 @@ public:
 		}else{
 			SetRobotSpeed(dAuxSpeed, wref*direction); 
 		}
-		
+
 		double ddist2 = Dist( current_position.x, current_position.y, last_waypoint.dX, last_waypoint.dY);
 		//
 		// When the robot is on the last waypoint, checks the distance to the end
