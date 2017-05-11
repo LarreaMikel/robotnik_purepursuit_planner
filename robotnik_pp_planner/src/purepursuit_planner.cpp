@@ -58,15 +58,15 @@
 #define D_LOOKAHEAD_MAX						1.1		// Maxima distancia del punto objetivo
 #define D_WHEEL_ROBOT_CENTER    			0.478   // Distance from the motor wheel to the robot center
 
-#define MAX_SPEED_LVL1						0.5
-#define MAX_SPEED_LVL2						0.3
-#define MAX_SPEED							1.2
+#define MAX_TURN_SPEED_LVL1					0.5
+#define MAX_TURN_SPEED_LVL2					0.2
+#define MAX_SPEED							1.5
 
 #define WAYPOINT_POP_DISTANCE_M				0.10		//Distancia mínima para alcanzar punto objetivo m (PurePursuit)
 
-#define AGVS_FIRST_DECELERATION_DISTANCE 	0.5 	// meters -> when the vehicle is arriving to the goal, it has to decelarate at this distance
-#define AGVS_FIRST_DECELERATION_MAXSPEED	0.15	// m/s
-#define AGVS_SECOND_DECELERATION_DISTANCE   0.25 	// meters -> when the vehicle is arriving to the goal, it has to decelarate another time at this distance
+#define AGVS_FIRST_DECELERATION_DISTANCE 	2.0 	// meters -> when the vehicle is arriving to the goal, it has to decelarate at this distance
+#define AGVS_FIRST_DECELERATION_MAXSPEED	0.3	// m/s
+#define AGVS_SECOND_DECELERATION_DISTANCE   0.5 	// meters -> when the vehicle is arriving to the goal, it has to decelarate another time at this distance
 #define AGVS_SECOND_DECELERATION_MAXSPEED	0.1 	// m/s
 #define AGVS_DEFAULT_KR	0.20						// 
 
@@ -77,10 +77,13 @@
 #define COMMAND_TWIST_STRING				"Twist" 
 
 
-#define DEFAULT_OBSTACLE_RANGE 1.0
-#define DEFAULT_FOOTPRINT_WIDTH 0.6
-#define DEFAULT_FOOTPRINT_LENGTH 1.0
-#define DEFAULT_LATERAL_CLEARANCE 0.5
+#define DEFAULT_OBSTACLE_RANGE 				1.0
+#define DEFAULT_FOOTPRINT_WIDTH 			0.6
+#define DEFAULT_FOOTPRINT_LENGTH 			1.0
+#define DEFAULT_LATERAL_CLEARANCE 			0.5
+
+#define GOAL_ERROR_TOLERANCE				0.05
+#define ERROR_GOAL_DISTANCE					0.10
 
 enum{
 	ODOM_SOURCE = 1,
@@ -561,9 +564,9 @@ class Path{
 
 					// Calcula velocidad maxima en funcion del giro de la curva
 					if(fabs(dAngle) >= (Pi/4)){
-						dAuxSpeed = MAX_SPEED_LVL2;
+						dAuxSpeed = MAX_TURN_SPEED_LVL2;
 					}else
-						dAuxSpeed = MAX_SPEED_LVL1;
+						dAuxSpeed = MAX_TURN_SPEED_LVL1;
 					//cout << "Aux speed = " << dAuxSpeed << ", Next speed =  " << vPoints[b].dSpeed << endl;
 					// Si la velocidad en ese waypoint supera el máximo establecido para un giro así
 					if(fabs(vPoints[b].dSpeed) > dAuxSpeed){
@@ -840,6 +843,17 @@ private:
 	ros::ServiceClient sc_enable_front_laser_;
 	//! Service to enable/disable back laser
 	ros::ServiceClient sc_enable_back_laser_;
+	//! goal tolerance
+	double goal_tolerance_;
+	double last_dist_to_goal;
+	//! 
+	bool static_lookahead_;
+	//! error tolerance
+	double goal_error_tolerance_;
+	//!	Distance from the point to start to turn
+	double path_turn_radius_distance_;
+	//! Flag to enable / disable the obstacle avoidance
+	bool obstacle_avoidance_;
 	
 public:
 	/*!	\fn summit_controller::purepursuit_planner()
@@ -862,6 +876,7 @@ public:
 		sComponentName.assign("purepursuit_planner_node");
 		iState = INIT_STATE;
 		direction = 0;
+		last_dist_to_goal = 9999999;
 	}
 
 	/*!	\fn purepursuit_planner::~purepursuit_planner()
@@ -961,6 +976,11 @@ public:
         private_node_handle_.param("footprint_length",footprint_length_,DEFAULT_FOOTPRINT_LENGTH);
         private_node_handle_.param("lateral_clearance",nav_lateral_clearance_,DEFAULT_LATERAL_CLEARANCE);
         private_node_handle_.param("obstacle_range", nav_obstacle_range_, DEFAULT_OBSTACLE_RANGE);
+        private_node_handle_.param("goal_tolerance", goal_tolerance_, WAYPOINT_POP_DISTANCE_M);
+        private_node_handle_.param("goal_error_tolerance", goal_error_tolerance_, GOAL_ERROR_TOLERANCE);
+        private_node_handle_.param("path_turn_radius_distance", path_turn_radius_distance_, AGVS_TURN_RADIUS);
+        private_node_handle_.param("static_lookahead", static_lookahead_, true);
+        private_node_handle_.param("obstacle_avoidance", obstacle_avoidance_, true);
 		
 		//private_node_handle_.param<std::string>("name_sc_enable_frot_laser_", name_sc_enable_front_laser_, "/s3000_laser_front/enable_disable");
 		//private_node_handl_.param<std::string>("name_sc_enable_back_laser", name_sc_enable_back_laser_, "/s3000_laser_back/enable_disable"	);
@@ -1191,7 +1211,13 @@ public:
 			ROS_ERROR("%s::StandbyState: Error receiving the odometry", sComponentName.c_str());
 			SwitchToState(EMERGENCY_STATE);
 		}else{
-            if(bEnabled && !bCancel && !bObstacle){
+			
+			bool obstacle_free = true;
+			
+			//if((obstacle_avoidance_ && !bObstacle) || not obstacle_avoidance_)
+			//	obstacle_free = true;
+				
+            if(bEnabled && !bCancel && obstacle_free){
 				
 				if(pathCurrent.Size() > 0 || MergePath() == OK){
 					ROS_INFO("%s::StandbyState: route available", sComponentName.c_str());
@@ -1204,8 +1230,8 @@ public:
                       }
                 }
 
-			}else
-				ROS_INFO("%s::StandbyState: Enabled(%d), Cancel(%d), Obstacle(%d)",sComponentName.c_str(), bEnabled, bCancel, bObstacle);
+			}//else
+			//	ROS_INFO("%s::StandbyState: Enabled(%d), Cancel(%d), Obstacle(%d)",sComponentName.c_str(), bEnabled, bCancel, bObstacle);
 				
 		}
 	}
@@ -1230,10 +1256,10 @@ public:
 			SwitchToState(STANDBY_STATE);
 			return;
 		}
-        if(bObstacle){
-          ROS_INFO("%s::ReadyState: Obstacle detected, cancel requested", sComponentName.c_str());
+        if(obstacle_avoidance_ && bObstacle){
+         // ROS_WARN("%s::ReadyState: Obstacle detected", sComponentName.c_str());
           SetRobotSpeed(0.0, 0.0);
-          SwitchToState(STANDBY_STATE);
+          //SwitchToState(STANDBY_STATE);
           return;
         }
 		
@@ -1482,7 +1508,8 @@ public:
 		
 		//
 		//Updates the lookahead depending of the current velocity
-		UpdateLookAhead();
+		if(not static_lookahead_)
+			UpdateLookAhead();
 		
 		//
 		// Get next point in cartesian coordinates
@@ -1565,22 +1592,37 @@ public:
 			SetRobotSpeed(dAuxSpeed, wref*direction); 
 		}
 		
+		double ddist2 = Dist( current_position.x, current_position.y, last_waypoint.dX, last_waypoint.dY);
 		//
 		// When the robot is on the last waypoint, checks the distance to the end
 		if( pathCurrent.GetCurrentWaypointIndex() >= (pathCurrent.NumOfWaypoints() - 2) ){
 			ret = -10;
-			double ddist2 = Dist( current_position.x, current_position.y, last_waypoint.dX, last_waypoint.dY);
-			// Distancia recorrida
-			//dDistCovered = Dist( current_position.px, current_position.py, odomWhenLastWaypoint.px, odomWhenLastWaypoint.py);
-			if (ddist2 < WAYPOINT_POP_DISTANCE_M) {
-				SetRobotSpeed(0.0, 0.0);
-				
-				ROS_INFO("%s::PurePursuit: target position reached (%lf, %lf, %lf). Ending current path", sComponentName.c_str(), current_position.x, current_position.x, current_position.theta*180.0/Pi);
-				
-				pathCurrent.Clear();
-				return 1;
+			//ROS_WARN("%s::PurePursuit: dist to goal = %.3lf m. Last = %.3lf", sComponentName.c_str(), ddist2, last_dist_to_goal);
+			
+			if(ddist2 <= ERROR_GOAL_DISTANCE){
+				if(ddist2 > last_dist_to_goal){ //and fabs(ddist2 - last_dist_to_goal) > ERROR_GOAL_DISTANCE){
+					ROS_ERROR("%s::PurePursuit: dist to goal = %.3lf m. Last = %.3lf. CANCELLING GOAL", sComponentName.c_str(), ddist2, last_dist_to_goal);
+					SetRobotSpeed(0.0, 0.0);
+					pathCurrent.Clear();
+					return -1;
+				}
+			
+				// Distancia recorrida
+				//dDistCovered = Dist( current_position.px, current_position.py, odomWhenLastWaypoint.px, odomWhenLastWaypoint.py);
+				if (ddist2 <= goal_tolerance_) {
+					SetRobotSpeed(0.0, 0.0);
+					
+					ROS_INFO("%s::PurePursuit: target position reached (%lf, %lf, %lf) at %.3lf m from the target. Ending current path", sComponentName.c_str(),
+					 current_position.x, current_position.x, current_position.theta*180.0/Pi, ddist2);
+					
+					pathCurrent.Clear();
+					return 1;
+				}
 			}
+			
 		}
+		
+		last_dist_to_goal = ddist2;
 
 		return 0;
 	}
@@ -1675,13 +1717,15 @@ public:
         objDet.front = bObsFront;
         objDet.back = bObsBack;
         pub_objectDetected.publish(objDet);
-
+		
+		if(bCancel)		// Performs the cancel in case of required
+			CancelPath();
+			
 		AnalyseCB();	// Checks action server state
 		
 		ReadAndPublish();	// Reads and publish into configured topics
 		
-		if(bCancel)		// Performs the cancel in case of required
-			CancelPath();
+		
 	}
 	
 	/*! \fn void OdomCallback(const nav_msgs::Odometry::ConstPtr& odom_value)
@@ -1919,7 +1963,7 @@ public:
 					
 					pathFilling.AddWaypoint(new_waypoint);							
 				}
-				if(pathFilling.Optimize(AGVS_TURN_RADIUS) != OK)
+				if(pathFilling.Optimize(path_turn_radius_distance_) != OK)
 					ROS_ERROR("%s::GoalCB: Error optimizing the path", sComponentName.c_str());
 
 				//pathFilling.Print();
@@ -1957,6 +2001,7 @@ public:
 					
 					return OK;
 				}
+				last_dist_to_goal = 99999999;
 			}
 		
 		}
