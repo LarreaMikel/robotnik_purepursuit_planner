@@ -767,8 +767,10 @@ private:
     bool bCancel;
     //! Mode for reading the position of the robot ("ODOM", "MAP")
     std::string position_source_;
-    //! Target frame for the transform from /map to it
-    std::string target_frame_;
+    //! Target frame of the base
+    std::string base_frame_id_;
+    //! global frame
+    std::string global_frame_id_;
     //! Mode in numeric format
     unsigned int ui_position_source;
     //!	Sets the type of command to send to the robot (Twist or ackermann)
@@ -854,6 +856,8 @@ private:
 	double path_turn_radius_distance_;
 	//! Flag to enable / disable the obstacle avoidance
 	bool obstacle_avoidance_;
+	//! flag ok if transform between frames is OK
+	bool transform_ok;
 	
 public:
 	/*!	\fn summit_controller::purepursuit_planner()
@@ -877,6 +881,7 @@ public:
 		iState = INIT_STATE;
 		direction = 0;
 		last_dist_to_goal = 9999999;
+		transform_ok = false;
 	}
 
 	/*!	\fn purepursuit_planner::~purepursuit_planner()
@@ -958,26 +963,28 @@ public:
 	void ROSSetup(){
 		string s_command_type;
 		
-		private_node_handle_.param<std::string>("odom_topic", odom_topic_, "/odom");
-		private_node_handle_.param("cmd_topic_vel", cmd_topic_vel_, std::string("/agvs_controller/command"));
+		private_node_handle_.param<std::string>("odom_topic", odom_topic_, "odom");
+		private_node_handle_.param("cmd_topic_vel", cmd_topic_vel_, std::string("cmd_vel"));
 		private_node_handle_.param("d_lookahead_min", d_lookahead_min_, D_LOOKAHEAD_MIN);
 		private_node_handle_.param("d_lookahead_max", d_lookahead_max_, D_LOOKAHEAD_MAX);
 		private_node_handle_.param("d_dist_wheel_to_center", d_dist_wheel_to_center_, D_WHEEL_ROBOT_CENTER);
 		private_node_handle_.param("max_speed", max_speed_, MAX_SPEED);
 		private_node_handle_.param("kr", Kr, AGVS_DEFAULT_KR);
-		private_node_handle_.param<std::string>("position_source", position_source_, "ODOM");
+		private_node_handle_.param<std::string>("position_source", position_source_, "ODOM"); // deprecated: keep backwards compatibility
 		private_node_handle_.param("desired_freq", desired_freq_, desired_freq_);
 		private_node_handle_.param<std::string>("command_type", s_command_type, COMMAND_ACKERMANN_STRING);
-		private_node_handle_.param<std::string>("target_frame", target_frame_, "/base_footprint");
-        private_node_handle_.param<string>("pcl_topic_front", pcl_topic_front_, "/scan_cloud_front");
-        private_node_handle_.param<string>("pcl_topic_back", pcl_topic_back_, "/scan_cloud_back");
+		private_node_handle_.param<std::string>("target_frame", base_frame_id_, "base_footprint"); // deprecated: keep backwards compatibility
+		private_node_handle_.param<std::string>("base_frame_id", base_frame_id_, "base_footprint");
+		private_node_handle_.param<std::string>("global_frame_id", global_frame_id_, "map");
+        private_node_handle_.param<string>("pcl_topic_front", pcl_topic_front_, "scan_cloud_front");
+        private_node_handle_.param<string>("pcl_topic_back", pcl_topic_back_, "scan_cloud_back");
 
         private_node_handle_.param("footprint_width",footprint_width_,DEFAULT_FOOTPRINT_WIDTH);
         private_node_handle_.param("footprint_length",footprint_length_,DEFAULT_FOOTPRINT_LENGTH);
         private_node_handle_.param("lateral_clearance",nav_lateral_clearance_,DEFAULT_LATERAL_CLEARANCE);
         private_node_handle_.param("obstacle_range", nav_obstacle_range_, DEFAULT_OBSTACLE_RANGE);
         private_node_handle_.param("goal_tolerance", goal_tolerance_, WAYPOINT_POP_DISTANCE_M);
-        private_node_handle_.param("goal_error_tolerance", goal_error_tolerance_, GOAL_ERROR_TOLERANCE);
+        private_node_handle_.param("goal_error_tolerance", goal_error_tolerance_, GOAL_ERROR_TOLERANCE); // Not used
         private_node_handle_.param("path_turn_radius_distance", path_turn_radius_distance_, AGVS_TURN_RADIUS);
         private_node_handle_.param("static_lookahead", static_lookahead_, true);
         private_node_handle_.param("obstacle_avoidance", obstacle_avoidance_, true);
@@ -985,8 +992,8 @@ public:
 		//private_node_handle_.param<std::string>("name_sc_enable_frot_laser_", name_sc_enable_front_laser_, "/s3000_laser_front/enable_disable");
 		//private_node_handl_.param<std::string>("name_sc_enable_back_laser", name_sc_enable_back_laser_, "/s3000_laser_back/enable_disable"	);
 
-        pcl_sub_front_=private_node_handle_.subscribe(pcl_topic_front_, 1, &purepursuit_planner_node::pclCallbackFront, this);
-        pcl_sub_back_=private_node_handle_.subscribe(pcl_topic_back_, 1, &purepursuit_planner_node::pclCallbackBack, this);
+        pcl_sub_front_=node_handle_.subscribe(pcl_topic_front_, 1, &purepursuit_planner_node::pclCallbackFront, this);
+        pcl_sub_back_=node_handle_.subscribe(pcl_topic_back_, 1, &purepursuit_planner_node::pclCallbackBack, this);
 		
 		if(s_command_type.compare(COMMAND_ACKERMANN_STRING) == 0){
 			command_type = COMMAND_ACKERMANN;
@@ -1009,18 +1016,18 @@ public:
 		if(command_type == COMMAND_ACKERMANN){
 			//
 			// Publish through the node handle Ackerman type messages to the command vel topic
-			vel_pub_ = private_node_handle_.advertise<ackermann_msgs::AckermannDriveStamped>(cmd_topic_vel_, 1);			
+			vel_pub_ = node_handle_.advertise<ackermann_msgs::AckermannDriveStamped>(cmd_topic_vel_, 1);			
 		}else{
 			//
 			// Publish through the node handle Twist type messages to the command vel topic
-			vel_pub_ = private_node_handle_.advertise<geometry_msgs::Twist>(cmd_topic_vel_, 1);	
+			vel_pub_ = node_handle_.advertise<geometry_msgs::Twist>(cmd_topic_vel_, 1);	
 		}
 		
 		//
-		if(ui_position_source == MAP_SOURCE)
-			tranform_map_pub_ = private_node_handle_.advertise<geometry_msgs::TransformStamped>("map_location", 100);
+		//if(ui_position_source == MAP_SOURCE)
+		tranform_map_pub_ = private_node_handle_.advertise<geometry_msgs::TransformStamped>("map_location", 100);
 		//status_pub_ = private_node_handle_.advertise<purepursuit_planner::ControllerStatus>("status", 1);
-		odom_sub_ = private_node_handle_.subscribe<nav_msgs::Odometry>(odom_topic_, 1, &purepursuit_planner_node::OdomCallback, this ); 
+		odom_sub_ = node_handle_.subscribe<nav_msgs::Odometry>(odom_topic_, 1, &purepursuit_planner_node::OdomCallback, this ); 
 		//cmd_vel_sub_ = private_node_handle_.subscribe<purepursuit_planner::AckermannDriveStamped>("command", 1, &purepursuit_planner_node::CmdVelCallback, this ); 
 		
 		// Diagnostics
@@ -1041,8 +1048,8 @@ public:
         //sc_enable_front_laser_ = private_node_handle_.serviceClient<s3000_laser::enable_disable>(name_sc_enable_front_laser_);
         //sc_enable_back_laser_ = private_node_handle_.serviceClient<s3000_laser::enable_disable>(name_sc_enable_back_laser_);
         
-		ROS_INFO("%s::ROSSetup(): odom_topic = %s, command_topic_vel = %s, position source = %s, desired_hz=%.3lf, min_lookahead = %.3lf, max_lookahead = %.3lf, kr = %.2lf, command_type = %s", sComponentName.c_str(), odom_topic_.c_str(),
-		 cmd_topic_vel_.c_str(), position_source_.c_str(), desired_freq_, d_lookahead_min_, d_lookahead_max_, Kr, s_command_type.c_str());
+		//ROS_INFO("%s::ROSSetup(): odom_topic = %s, command_topic_vel = %s, position source = %s, desired_hz=%.3lf, min_lookahead = %.3lf, max_lookahead = %.3lf, kr = %.2lf, command_type = %s", sComponentName.c_str(), odom_topic_.c_str(),
+		// cmd_topic_vel_.c_str(), position_source_.c_str(), desired_freq_, d_lookahead_min_, d_lookahead_max_, Kr, s_command_type.c_str());
 		
 		//ROS_INFO("%s::ROSSetup(): laser_topics: front -> %s, back -> %s", sComponentName.c_str(), name_sc_enable_front_laser_.c_str(), name_sc_enable_back_laser_.c_str());
 		
@@ -1094,6 +1101,10 @@ public:
 	*/
 	int ReadAndPublish()
 	{
+		objDet.front = bObsFront;
+        objDet.back = bObsBack;
+        pub_objectDetected.publish(objDet);
+        
 		//updater_diagnostic_odom->tick(ros::Time::now());
 		updater_diagnostic.update();
 		return(0);
@@ -1141,7 +1152,7 @@ public:
 			
 		// while(node_handle_.ok()) {
 		while(ros::ok()) {
-			
+
 			switch(iState){
 				
 				case INIT_STATE:
@@ -1191,9 +1202,10 @@ public:
 	/*!	\fn void InitState()
 	*/
 	void InitState(){
-        //ROS_INFO("purepursuit_planner::InitSate: bInitialized:%d bRunning:%d CheckOdomReceive:%d", bInitialized, bRunning, CheckOdomReceive());
+		//ROS_INFO("purepursuit_planner::InitState: %d, %d, %d",bInitialized, bRunning, transform_ok);
+
 		if(bInitialized && bRunning){
-			if(CheckOdomReceive() == 0)
+			if(transform_ok)
 				SwitchToState(STANDBY_STATE);
 		}else{
 			if(!bInitialized)
@@ -1207,8 +1219,8 @@ public:
 	/*!	\fn void StandbyState()
 	*/
 	void StandbyState(){
-		if(CheckOdomReceive() == -1){
-			ROS_ERROR("%s::StandbyState: Error receiving the odometry", sComponentName.c_str());
+		if(not transform_ok){
+			ROS_ERROR("%s::StandbyState: Error getting the transform between %s -> %s", sComponentName.c_str(), global_frame_id_.c_str(), base_frame_id_.c_str());
 			SwitchToState(EMERGENCY_STATE);
 		}else{
 			
@@ -1239,7 +1251,8 @@ public:
 	/*!	\fn void ReadyState()
 	*/
 	void ReadyState(){
-		if(CheckOdomReceive() == -1){
+		if(not transform_ok){
+			ROS_ERROR("%s::ReadyState: Error getting the transform between %s -> %s", sComponentName.c_str(), global_frame_id_.c_str(), base_frame_id_.c_str());
 			SetRobotSpeed(0.0, 0.0);
 			SwitchToState(EMERGENCY_STATE);
 			return;
@@ -1679,7 +1692,7 @@ public:
 	/*!	\fn void EmergencyState()
 	*/
 	void EmergencyState(){
-		if(CheckOdomReceive() == 0){
+		if(transform_ok){
 			SwitchToState(STANDBY_STATE);
 			return;
 		}
@@ -1697,26 +1710,26 @@ public:
 	void AllState(){
 		
 		// Only if we use the map as source for positioning
-		if(ui_position_source == MAP_SOURCE){		
-			try{
-				listener.lookupTransform("/map", target_frame_, ros::Time(0), transform);
-				geometry_msgs::TransformStamped msg;
-				tf::transformStampedTFToMsg(transform, msg);
-				pose2d_robot.x = msg.transform.translation.x;
-				pose2d_robot.y = msg.transform.translation.y;
-				pose2d_robot.theta = tf::getYaw(msg.transform.rotation);  
-				// Safety check
-				last_map_time = ros::Time::now();
-				msg.header.stamp = last_map_time;
-				tranform_map_pub_.publish(msg);
-			}catch (tf::TransformException ex){
-				//ROS_ERROR("%s::AllState: %s", sComponentName.c_str(), ex.what());
-			}
+		//if(ui_position_source == MAP_SOURCE){		
+		try{
+			listener.lookupTransform(global_frame_id_, base_frame_id_, ros::Time(0), transform);
+			geometry_msgs::TransformStamped msg;
+			tf::transformStampedTFToMsg(transform, msg);
+			pose2d_robot.x = msg.transform.translation.x;
+			pose2d_robot.y = msg.transform.translation.y;
+			pose2d_robot.theta = tf::getYaw(msg.transform.rotation);  
+			// Safety check
+			last_map_time = ros::Time::now();
+			msg.header.stamp = last_map_time;
+			tranform_map_pub_.publish(msg);
+			transform_ok = true;
+		}catch (tf::TransformException ex){
+			ROS_ERROR("%s::AllState: %s", sComponentName.c_str(), ex.what());
+			transform_ok = false;
 		}
+		//}
 		
-        objDet.front = bObsFront;
-        objDet.back = bObsBack;
-        pub_objectDetected.publish(objDet);
+        
 		
 		if(bCancel)		// Performs the cancel in case of required
 			CancelPath();
@@ -1755,7 +1768,7 @@ public:
 		* \return 0 if OK
 		* \return -1 if ERROR
 	*/
-	int CheckOdomReceive()
+	int CheckOdomReceive() // DEPRECATED
 	{		
 		// Safety check
 		if((ros::Time::now() - last_command_time).toSec() > ODOM_TIMEOUT_ERROR)
