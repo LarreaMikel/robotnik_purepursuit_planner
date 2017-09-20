@@ -184,9 +184,9 @@ class PointPathManager(InteractiveMarkerServer):
 		self.points_file_path = os.path.join(rp.get_path('robotnik_pp_planner'), 'config', 'waypoints.txt')
 		
 		#rospy.Timer(rospy.Duration(5), self.createNewPoint)
-		self._go_service = rospy.Service('%s/go'%rospy.get_name(), Empty, self.goService)
-		self._go_back_service = rospy.Service('%s/go_back'%rospy.get_name(), Empty, self.goBackService)
-		self._cancel_service = rospy.Service('%s/cancel'%rospy.get_name(), Empty, self.cancelService)
+		self._go_service = rospy.Service('~go',Empty, self.goService)
+		self._go_back_service = rospy.Service('~go_back', Empty, self.goBackService)
+		self._cancel_service = rospy.Service('~cancel', Empty, self.cancelService)
 		
 	
 	## @brief Creates a new PointPath and save it a list
@@ -387,7 +387,7 @@ if __name__=="__main__":
 	_name = rospy.get_name().replace('/','')
 	
 	arg_defaults = {
-	  'frame_id': '/map',
+	  'frame_id': 'map',
 	  'planner': 'purepursuit_planner'
 	}
 	
@@ -396,7 +396,7 @@ if __name__=="__main__":
 	for name in arg_defaults:
 		try:
 			if rospy.search_param(name): 
-				args[name] = rospy.get_param('%s/%s'%(_name, name)) # Adding the name of the node, because the para has the namespace of the node
+				args[name] = rospy.get_param('~'+name) # Adding the name of the node, because the para has the namespace of the node
 			else:
 				args[name] = arg_defaults[name]
 			#print name
@@ -406,8 +406,9 @@ if __name__=="__main__":
 	server = PointPathManager(_name, frame_id = args['frame_id'], planner = args['planner'])
 	
 
+	t_sleep = 0.5
 	
-	while rospy.is_shutdown():
+	while not rospy.is_shutdown():
 		
 		try:
 			rospy.sleep(t_sleep)
