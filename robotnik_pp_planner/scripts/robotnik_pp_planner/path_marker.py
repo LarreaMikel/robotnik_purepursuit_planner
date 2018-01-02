@@ -48,6 +48,7 @@ class PurepursuitClient():
 		# Creates the SimpleActionClient, passing the type of the action
 		# (GoTo) to the constructor.
 		self.client = actionlib.SimpleActionClient(planner_name, GoToAction)
+		rospy.loginfo('PurepursuitClient: connecting to planner %s',planner_name )
 
 	## @brief Sends the goal to 
 	## @return 0 if OK, -1 if no server, -2 if it's tracking a goal at the moment
@@ -414,7 +415,6 @@ if __name__=="__main__":
 			rospy.sleep(t_sleep)
 		except rospy.exceptions.ROSInterruptException:
 			rospy.loginfo('Main: ROS interrupt exception')
-			self.running = False
 			
 		
 
