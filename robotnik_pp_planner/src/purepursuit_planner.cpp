@@ -1724,7 +1724,7 @@ public:
 			tranform_map_pub_.publish(msg);
 			transform_ok = true;
 		}catch (tf::TransformException ex){
-			ROS_ERROR("%s::AllState: %s", sComponentName.c_str(), ex.what());
+			ROS_ERROR_THROTTLE(5,"%s::AllState: %s", sComponentName.c_str(), ex.what());
 			transform_ok = false;
 		}
 		//}
